@@ -1,0 +1,1174 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description"
+    content="AI-powered code smell detector. Paste your Python code and instantly get severity classification, detected smells, and fix recommendations." />
+  <title>Code Smell Detector · IILM University · BTP2CSE333</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet" />
+
+  <style>
+    /* ─── Reset & Base ─── */
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #000000;
+      --purple: #7C3AED;
+      --purple-light: #A78BFA;
+      --blue: #3B82F6;
+      --card-bg: rgba(255, 255, 255, 0.04);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --text-primary: #FFFFFF;
+      --text-muted: #71717A;
+      --text-dim: #52525B;
+      --green: #22C55E;
+      --yellow: #EAB308;
+      --red: #EF4444;
+      --radius-card: 16px;
+      --radius-pill: 999px;
+      --font: 'Inter', system-ui, -apple-system, sans-serif;
+      --mono: 'JetBrains Mono', 'Fira Code', monospace;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text-primary);
+      font-family: var(--font);
+      min-height: 100vh;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* ─── Grain Noise Overlay ─── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+      background-repeat: repeat;
+      background-size: 180px 180px;
+      opacity: 0.035;
+      pointer-events: none;
+      z-index: 0;
+      mix-blend-mode: overlay;
+    }
+
+    /* ─── Ambient Blobs ─── */
+    .blobs {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+
+    .blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(100px);
+    }
+
+    .blob-1 {
+      width: 700px;
+      height: 700px;
+      top: -300px;
+      left: -250px;
+      background: radial-gradient(circle at center, rgba(124, 58, 237, 0.4), transparent 70%);
+      animation: float1 9s ease-in-out infinite;
+    }
+
+    .blob-2 {
+      width: 600px;
+      height: 600px;
+      bottom: -250px;
+      right: -200px;
+      background: radial-gradient(circle at center, rgba(59, 130, 246, 0.35), transparent 70%);
+      animation: float2 11s ease-in-out infinite;
+    }
+
+    .blob-3 {
+      width: 400px;
+      height: 400px;
+      top: 50%;
+      left: 55%;
+      background: radial-gradient(circle at center, rgba(124, 58, 237, 0.15), transparent 70%);
+      animation: float1 14s ease-in-out infinite reverse;
+    }
+
+    @keyframes float1 {
+
+      0%,
+      100% {
+        transform: translateY(0px) translateX(0px) scale(1);
+      }
+
+      33% {
+        transform: translateY(-30px) translateX(15px) scale(1.03);
+      }
+
+      66% {
+        transform: translateY(15px) translateX(-10px) scale(0.97);
+      }
+    }
+
+    @keyframes float2 {
+
+      0%,
+      100% {
+        transform: translateY(0px) translateX(0px) scale(1);
+      }
+
+      40% {
+        transform: translateY(25px) translateX(-20px) scale(1.04);
+      }
+
+      70% {
+        transform: translateY(-15px) translateX(10px) scale(0.96);
+      }
+    }
+
+    /* ─── Layout ─── */
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 740px;
+      margin: 0 auto;
+      padding: 60px 24px 80px;
+    }
+
+    /* ─── Header ─── */
+    .header {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+
+    .pill-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 14px;
+      border-radius: var(--radius-pill);
+      border: 1px solid rgba(124, 58, 237, 0.45);
+      background: rgba(124, 58, 237, 0.08);
+      color: var(--purple-light);
+      font-size: 10.5px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+      box-shadow: 0 0 20px rgba(124, 58, 237, 0.2);
+      animation: badgePulse 3s ease-in-out infinite;
+    }
+
+    @keyframes badgePulse {
+
+      0%,
+      100% {
+        box-shadow: 0 0 16px rgba(124, 58, 237, 0.2);
+      }
+
+      50% {
+        box-shadow: 0 0 30px rgba(124, 58, 237, 0.4);
+      }
+    }
+
+    .badge-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--purple-light);
+      animation: dotPulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes dotPulse {
+
+      0%,
+      100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      50% {
+        opacity: 0.5;
+        transform: scale(0.7);
+      }
+    }
+
+    .title {
+      font-size: clamp(32px, 7vw, 72px);
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      line-height: 1.05;
+      margin-bottom: 20px;
+      white-space: nowrap;
+      background: linear-gradient(135deg, #D8B4FE 0%, #F472B6 40%, #60A5FA 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: drop-shadow(0 4px 24px rgba(244, 114, 182, 0.25));
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 17px;
+      font-weight: 400;
+      line-height: 1.6;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    /* ─── Glassmorphism Card ─── */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: var(--radius-card);
+      padding: 28px;
+    }
+
+    /* ─── Editor Card ─── */
+    .editor-card {
+      margin-bottom: 20px;
+    }
+
+    .input-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .input-label-icon {
+      width: 16px;
+      height: 16px;
+      opacity: 0.6;
+    }
+
+    #codeInput {
+      width: 100%;
+      min-height: 320px;
+      background: rgba(0, 0, 0, 0.45);
+      color: #E4E4E7;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 10px;
+      padding: 18px 20px;
+      font-family: var(--mono);
+      font-size: 13.5px;
+      line-height: 1.7;
+      resize: vertical;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      tab-size: 2;
+    }
+
+    #codeInput::placeholder {
+      color: rgba(113, 113, 122, 0.5);
+    }
+
+    #codeInput:focus {
+      border-color: rgba(124, 58, 237, 0.4);
+      box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.08), inset 0 0 30px rgba(124, 58, 237, 0.02);
+    }
+
+    /* ─── Button ─── */
+    .btn-wrapper {
+      margin-top: 16px;
+    }
+
+    #analyzeBtn {
+      width: 100%;
+      padding: 15px 28px;
+      border-radius: 8px;
+      background: #18181b;
+      color: #e4e4e7;
+      border: 1px solid #3f3f46;
+      font-family: var(--font);
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: all 0.5s ease;
+      position: relative;
+      overflow: hidden;
+      z-index: 0;
+    }
+
+    #analyzeBtn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      transform: translate(150%, 150%) scale(2.5);
+      border-radius: 100%;
+      background: #e4e4e7;
+      transition: transform 1s ease;
+    }
+
+    #analyzeBtn:hover:not(:disabled) {
+      transform: scale(1.05);
+      color: #18181b;
+    }
+
+    #analyzeBtn:hover:not(:disabled)::before {
+      transform: translate(0, 0) scale(2.5);
+    }
+
+    #analyzeBtn:active:not(:disabled) {
+      transform: scale(0.98);
+    }
+
+    #analyzeBtn * {
+      pointer-events: none;
+    }
+
+    #analyzeBtn:disabled {
+      opacity: 0.75;
+      cursor: not-allowed;
+      background: rgba(255, 255, 255, 0.85);
+    }
+
+    /* ─── Spinner ─── */
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2.5px solid rgba(0, 0, 0, 0.2);
+      border-top-color: #7C3AED;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* ─── Error Toast ─── */
+    .error-toast {
+      margin-top: 14px;
+      padding: 12px 16px;
+      background: rgba(239, 68, 68, 0.08);
+      border: 1px solid rgba(239, 68, 68, 0.25);
+      border-radius: 10px;
+      color: #FCA5A5;
+      font-size: 13.5px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      animation: slideUp 0.2s ease;
+    }
+
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(4px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* ─── Results Card ─── */
+    .results-card {
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.4s ease, transform 0.4s ease;
+      pointer-events: none;
+    }
+
+    .results-card.visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: all;
+    }
+
+    /* Results Header */
+    .results-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 28px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    .results-title-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .results-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+    }
+
+    /* Severity Badge */
+    .severity-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 18px;
+      border-radius: var(--radius-pill);
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+    }
+
+    .severity-badge.LOW {
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      color: #4ADE80;
+      box-shadow: 0 0 20px rgba(34, 197, 94, 0.15);
+    }
+
+    .severity-badge.MEDIUM {
+      background: rgba(234, 179, 8, 0.1);
+      border: 1px solid rgba(234, 179, 8, 0.3);
+      color: #FDE047;
+      box-shadow: 0 0 20px rgba(234, 179, 8, 0.15);
+    }
+
+    .severity-badge.HIGH {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #F87171;
+      box-shadow: 0 0 20px rgba(239, 68, 68, 0.15);
+    }
+
+    .severity-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      animation: dotPulse 1.5s ease-in-out infinite;
+    }
+
+    .LOW .severity-dot {
+      background: #4ADE80;
+    }
+
+    .MEDIUM .severity-dot {
+      background: #FDE047;
+    }
+
+    .HIGH .severity-dot {
+      background: #F87171;
+    }
+
+    .model-note {
+      font-size: 11px;
+      color: var(--text-dim);
+      padding: 4px 10px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: var(--radius-pill);
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    /* Sections */
+    .results-section {
+      margin-bottom: 24px;
+    }
+
+    .section-heading {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section-heading::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--card-border);
+    }
+
+    /* Smells List */
+    .smells-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      list-style: none;
+    }
+
+    .smell-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      background: rgba(124, 58, 237, 0.08);
+      border: 1px solid rgba(124, 58, 237, 0.2);
+      border-radius: var(--radius-pill);
+      color: var(--purple-light);
+      font-size: 13px;
+      font-weight: 500;
+      animation: tagIn 0.3s ease backwards;
+    }
+
+    @keyframes tagIn {
+      from {
+        opacity: 0;
+        transform: scale(0.92);
+      }
+
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    .no-smells {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #4ADE80;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    /* Metrics Grid */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 10px;
+    }
+
+    .metric-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 10px;
+      padding: 14px 16px;
+      transition: border-color 0.2s, background 0.2s;
+      animation: metricIn 0.3s ease backwards;
+    }
+
+    .metric-card:hover {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(124, 58, 237, 0.2);
+    }
+
+    @keyframes metricIn {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .metric-label {
+      font-size: 10.5px;
+      font-weight: 600;
+      color: var(--text-dim);
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .metric-value {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text-primary);
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+    }
+
+    .metric-value.flagged {
+      color: #F87171;
+    }
+
+    .metric-value.warn {
+      color: #FDE047;
+    }
+
+    /* Recommendations */
+    .recs-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .rec-item {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      padding: 14px 16px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 10px;
+      font-size: 13.5px;
+      color: #D4D4D8;
+      line-height: 1.55;
+      animation: metricIn 0.3s ease backwards;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .rec-item:hover {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(59, 130, 246, 0.2);
+    }
+
+    .rec-number {
+      flex-shrink: 0;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: rgba(59, 130, 246, 0.12);
+      border: 1px solid rgba(59, 130, 246, 0.25);
+      color: #93C5FD;
+      font-size: 11px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Reset Button */
+    .reset-btn {
+      margin-top: 24px;
+      width: 100%;
+      padding: 12px 24px;
+      border-radius: var(--radius-pill);
+      background: transparent;
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      font-family: var(--font);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s, background 0.2s;
+    }
+
+    .reset-btn:hover {
+      border-color: rgba(255, 255, 255, 0.2);
+      color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    /* ─── Footer ─── */
+    .footer {
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      margin-top: 60px;
+      padding-top: 24px;
+      border-top: 1px solid rgba(255, 255, 255, 0.04);
+    }
+
+    /* ─── Divider ─── */
+    .divider {
+      height: 1px;
+      background: var(--card-border);
+      margin: 24px 0;
+    }
+
+    /* ─── Responsive ─── */
+    @media (max-width: 600px) {
+      .container {
+        padding: 40px 16px 60px;
+      }
+
+      .card {
+        padding: 20px;
+      }
+
+      .title {
+        font-size: 32px;
+      }
+
+      .metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .results-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Grain is applied via body::before CSS -->
+
+  <!-- Ambient Blobs -->
+  <div class="blobs" aria-hidden="true">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+  </div>
+
+  <main class="container">
+
+    <!-- ── Header ── -->
+    <header class="header">
+      <div>
+        <span class="pill-badge">
+          <span class="badge-dot" aria-hidden="true"></span>
+          ML-POWERED
+        </span>
+      </div>
+      <h1 class="title" id="mainTitle">Code Smell Detector</h1>
+      <p class="subtitle">Paste your Python code and get instant AI-driven smell analysis with severity classification
+        and fix recommendations.</p>
+    </header>
+
+    <!-- ── Editor Card ── -->
+    <section class="card editor-card" aria-label="Code input">
+      <label class="input-label" for="codeInput">
+        <svg class="input-label-icon" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M5.5 3.5L2 7L5.5 10.5M10.5 3.5L14 7L10.5 10.5M9 2L7 12" stroke="currentColor" stroke-width="1.5"
+            stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        Your Code
+      </label>
+
+      <textarea id="codeInput" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" placeholder="# Paste your Python code here...
+#
+# Example:
+# def my_function(a, b, c, d, e):
+#     if a > 0:
+#         for i in range(100):
+#             ..."></textarea>
+
+      <div class="btn-wrapper">
+        <button id="analyzeBtn" type="button" aria-live="polite">
+          <span class="spinner hidden" id="spinner" aria-hidden="true"></span>
+          <span id="btnText">Check for Code Smell</span>
+        </button>
+      </div>
+
+      <div id="errorToast" class="error-toast hidden" role="alert">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <circle cx="8" cy="8" r="7" stroke="#F87171" stroke-width="1.5" />
+          <path d="M8 5v3M8 10.5v.5" stroke="#F87171" stroke-width="1.5" stroke-linecap="round" />
+        </svg>
+        <span id="errorText"></span>
+      </div>
+    </section>
+
+    <!-- ── Results Card ── -->
+    <section class="card results-card" id="resultsSection" aria-label="Analysis results" aria-live="polite">
+
+      <div class="results-header">
+        <div class="results-title-group">
+          <span class="results-title">Analysis Complete</span>
+          <div class="severity-badge" id="severityBadge">
+            <span class="severity-dot"></span>
+            <span id="severityLabel">—</span>
+          </div>
+        </div>
+        <span class="model-note" id="modelNote">—</span>
+      </div>
+
+      <!-- Detected Smells -->
+      <div class="results-section">
+        <h2 class="section-heading">Detected Smells</h2>
+        <ul class="smells-list" id="smellsList"></ul>
+      </div>
+
+      <!-- Code Metrics -->
+      <div class="results-section">
+        <h2 class="section-heading">Code Metrics</h2>
+        <div class="metrics-grid" id="metricsGrid"></div>
+      </div>
+
+      <!-- Recommendations -->
+      <div class="results-section" id="recsSection">
+        <h2 class="section-heading">Recommendations</h2>
+        <ol class="recs-list" id="recsList"></ol>
+      </div>
+
+      <button class="reset-btn" id="resetBtn" type="button">↩ Analyze Another Snippet</button>
+    </section>
+
+    <!-- ── Footer ── -->
+    <footer class="footer">
+      Code Smell Detector &middot; IILM University &middot; BTP2CSE333
+    </footer>
+
+  </main>
+
+  <script>
+    // ────────────────────────────────────────────────
+    //  Text Scramble Effect
+    // ────────────────────────────────────────────────
+    class TextScramble {
+      constructor(el, options = {}) {
+        this.el = el;
+        this.text = el.textContent || '';
+        this.duration = options.duration || 0.8;
+        this.speed = options.speed || 0.04;
+        this.characterSet = options.characterSet || 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        this.isAnimating = false;
+        this.interval = null;
+      }
+
+      scramble() {
+        if (this.isAnimating) return;
+        this.isAnimating = true;
+
+        const steps = this.duration / this.speed;
+        let step = 0;
+
+        this.interval = setInterval(() => {
+          let scrambled = '';
+          const progress = step / steps;
+
+          for (let i = 0; i < this.text.length; i++) {
+            if (this.text[i] === ' ') {
+              scrambled += ' ';
+              continue;
+            }
+
+            if (progress * this.text.length > i) {
+              scrambled += this.text[i];
+            } else {
+              scrambled += this.characterSet[Math.floor(Math.random() * this.characterSet.length)];
+            }
+          }
+
+          this.el.textContent = scrambled;
+          step++;
+
+          if (step > steps) {
+            clearInterval(this.interval);
+            this.el.textContent = this.text;
+            this.isAnimating = false;
+          }
+        }, this.speed * 1000);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const titleEl = document.getElementById('mainTitle');
+      if (titleEl) {
+        const scrambler = new TextScramble(titleEl, { duration: 0.8, speed: 0.04 });
+        scrambler.scramble();
+        titleEl.addEventListener('mouseenter', () => scrambler.scramble());
+      }
+    });
+    // ────────────────────────────────────────────────
+    //  Configuration
+    // ────────────────────────────────────────────────
+    const API_BASE = 'http://localhost:8000';
+    const API_URL = `${API_BASE}/analyze`;
+
+    // ────────────────────────────────────────────────
+    //  DOM References
+    // ────────────────────────────────────────────────
+    const codeInput = document.getElementById('codeInput');
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    const btnText = document.getElementById('btnText');
+    const spinner = document.getElementById('spinner');
+    const errorToast = document.getElementById('errorToast');
+    const errorText = document.getElementById('errorText');
+    const resultsSection = document.getElementById('resultsSection');
+    const severityBadge = document.getElementById('severityBadge');
+    const severityLabel = document.getElementById('severityLabel');
+    const modelNote = document.getElementById('modelNote');
+    const smellsList = document.getElementById('smellsList');
+    const metricsGrid = document.getElementById('metricsGrid');
+    const recsSection = document.getElementById('recsSection');
+    const recsList = document.getElementById('recsList');
+    const resetBtn = document.getElementById('resetBtn');
+
+    // ────────────────────────────────────────────────
+    //  Severity Config
+    // ────────────────────────────────────────────────
+    function getSeverityConfig(level) {
+      const map = {
+        LOW: { emoji: '🟢', label: 'LOW', cls: 'LOW' },
+        MEDIUM: { emoji: '🟡', label: 'MEDIUM', cls: 'MEDIUM' },
+        HIGH: { emoji: '🔴', label: 'HIGH', cls: 'HIGH' },
+      };
+      return map[level] || map['MEDIUM'];
+    }
+
+    // ────────────────────────────────────────────────
+    //  Metric Display Names & Flagging Thresholds
+    // ────────────────────────────────────────────────
+    const METRIC_META = {
+      loc: { label: 'Lines of Code', warn: 200, flag: 500 },
+      cyclomatic_complexity: { label: 'Cyclomatic CC', warn: 7, flag: 10 },
+      num_functions: { label: 'Functions', warn: 10, flag: 20 },
+      avg_function_length: { label: 'Avg Fn Length', warn: 20, flag: 30 },
+      max_function_length: { label: 'Max Fn Length', warn: 30, flag: 50 },
+      num_classes: { label: 'Classes', warn: 3, flag: 6 },
+      duplicate_ratio: { label: 'Duplicate Ratio', warn: 0.15, flag: 0.25 },
+      max_nesting_depth: { label: 'Max Nesting', warn: 3, flag: 5 },
+      comment_ratio: { label: 'Comment Ratio', warn: null, flag: null },
+      avg_params: { label: 'Avg Params', warn: 3, flag: 4 },
+    };
+
+    // ────────────────────────────────────────────────
+    //  Loading State
+    // ────────────────────────────────────────────────
+    function setLoadingState(isLoading) {
+      analyzeBtn.disabled = isLoading;
+      if (isLoading) {
+        spinner.classList.remove('hidden');
+        btnText.textContent = 'Analyzing...';
+      } else {
+        spinner.classList.add('hidden');
+        btnText.textContent = 'Check for Code Smell';
+      }
+    }
+
+    // ────────────────────────────────────────────────
+    //  Show / Hide Error
+    // ────────────────────────────────────────────────
+    function showError(msg) {
+      errorText.textContent = msg;
+      errorToast.classList.remove('hidden');
+    }
+
+    function hideError() {
+      errorToast.classList.add('hidden');
+      errorText.textContent = '';
+    }
+
+    // ────────────────────────────────────────────────
+    //  Clear Results (race-condition safe)
+    // ────────────────────────────────────────────────
+    let _clearTimer = null;
+
+    function _doClear() {
+      smellsList.innerHTML = '';
+      metricsGrid.innerHTML = '';
+      recsList.innerHTML = '';
+      severityLabel.textContent = '—';
+      severityBadge.className = 'severity-badge';
+      modelNote.textContent = '—';
+    }
+
+    function clearResults(instant = false) {
+      resultsSection.classList.remove('visible');
+      if (_clearTimer) { clearTimeout(_clearTimer); _clearTimer = null; }
+      if (instant) {
+        _doClear();
+      } else {
+        _clearTimer = setTimeout(() => { _doClear(); _clearTimer = null; }, 320);
+      }
+    }
+
+    // ────────────────────────────────────────────────
+    //  API Call
+    // ────────────────────────────────────────────────
+    async function callAnalyzeAPI(code) {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Server error' }));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+      return res.json();
+    }
+
+    // ────────────────────────────────────────────────
+    //  Render Results
+    // ────────────────────────────────────────────────
+    function renderSmells(smells) {
+      smellsList.innerHTML = '';
+      if (!smells || smells.length === 0) {
+        smellsList.innerHTML = `<li class="no-smells"><span>✓</span> No major smells detected</li>`;
+        return;
+      }
+      smells.forEach((smell, i) => {
+        const li = document.createElement('li');
+        li.className = 'smell-tag';
+        li.style.animationDelay = `${i * 60}ms`;
+        li.innerHTML = `<span>⚠</span>${smell}`;
+        smellsList.appendChild(li);
+      });
+    }
+
+    function renderMetricsGrid(metrics) {
+      metricsGrid.innerHTML = '';
+      const entries = Object.entries(metrics);
+      entries.forEach(([key, val], i) => {
+        const meta = METRIC_META[key] || { label: key, warn: null, flag: null };
+        const display = typeof val === 'number'
+          ? (Number.isInteger(val) ? val : val.toFixed(3))
+          : val;
+
+        let valCls = '';
+        if (meta.flag !== null && val >= meta.flag) valCls = 'flagged';
+        else if (meta.warn !== null && val >= meta.warn) valCls = 'warn';
+
+        const card = document.createElement('div');
+        card.className = 'metric-card';
+        card.style.animationDelay = `${i * 40}ms`;
+        card.innerHTML = `
+          <div class="metric-label">${meta.label}</div>
+          <div class="metric-value ${valCls}">${display}</div>
+        `;
+        metricsGrid.appendChild(card);
+      });
+    }
+
+    function renderRecs(recommendations) {
+      recsList.innerHTML = '';
+      if (!recommendations || recommendations.length === 0) {
+        recsSection.style.display = 'none';
+        return;
+      }
+      recsSection.style.display = '';
+      recommendations.forEach((rec, i) => {
+        const li = document.createElement('li');
+        li.className = 'rec-item';
+        li.style.animationDelay = `${i * 70}ms`;
+        li.innerHTML = `<span class="rec-number">${i + 1}</span><span>${rec}</span>`;
+        recsList.appendChild(li);
+      });
+    }
+
+    function renderResults(data) {
+      // Cancel any pending clear timer before we render
+      if (_clearTimer) { clearTimeout(_clearTimer); _clearTimer = null; }
+      _doClear();
+
+      // Severity
+      const cfg = getSeverityConfig(data.severity);
+      severityBadge.className = `severity-badge ${cfg.cls}`;
+      severityLabel.textContent = `${cfg.emoji}  ${cfg.label} SEVERITY`;
+
+      // Model note
+      const mu = data.model_used;
+      modelNote.textContent =
+        mu === 'ml_classifier' ? '⚡ ML Classifier' :
+        mu === 'ml_adapted'    ? '⚡ ML + Rules'    :
+                                 '📐 Rule-Based';
+
+      // Sections
+      renderSmells(data.smells);
+      renderMetricsGrid(data.metrics);
+      renderRecs(data.recommendations);
+
+      // Reveal
+      resultsSection.classList.remove('hidden');
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          resultsSection.classList.add('visible');
+          resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      });
+    }
+
+    // ────────────────────────────────────────────────
+    //  Main Handler
+    // ────────────────────────────────────────────────
+    async function handleAnalyze() {
+      const code = codeInput.value.trim();
+
+      hideError();
+
+      if (!code) {
+        showError('Please paste some code before analyzing.');
+        codeInput.focus();
+        return;
+      }
+
+      // Immediately clear synchronously so there's no leftover state
+      clearResults(true);
+      setLoadingState(true);
+
+      try {
+        const data = await callAnalyzeAPI(code);
+        renderResults(data);
+      } catch (err) {
+        if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+          showError('Cannot reach the backend. Make sure uvicorn is running on port 8000.');
+        } else {
+          showError(`Analysis failed: ${err.message}`);
+        }
+      } finally {
+        setLoadingState(false);
+      }
+    }
+
+    // ────────────────────────────────────────────────
+    //  Reset Handler
+    // ────────────────────────────────────────────────
+    function handleReset() {
+      codeInput.value = '';
+      clearResults();
+      hideError();
+      codeInput.focus();
+      setTimeout(() => {
+        resultsSection.classList.add('hidden');
+      }, 350);
+    }
+
+    // ────────────────────────────────────────────────
+    //  Event Listeners
+    // ────────────────────────────────────────────────
+    analyzeBtn.addEventListener('click', handleAnalyze);
+    resetBtn.addEventListener('click', handleReset);
+
+    // Ctrl+Enter shortcut
+    codeInput.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        handleAnalyze();
+      }
+    });
+
+    // Initial state
+    resultsSection.classList.add('hidden');
+  </script>
+</body>
+
+</html>
