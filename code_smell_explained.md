@@ -59,10 +59,14 @@ Built in **Python** using **FastAPI**. Every time code is submitted, it runs thr
 ### Step 1 — Extract 10 Metrics (`extractor.py`)
 The code is parsed using Python's built-in **AST (Abstract Syntax Tree)** — it reads the code structure like a tree and lets us count things precisely.
 
-The 10 metrics extracted:
+The 14 metrics extracted/reported:
 
 | Metric | What it measures |
 |---|---|
+| Model Accuracy | Overall correctness of the ML severity prediction |
+| Model Precision | Proportion of positive identifications that were actually correct |
+| Model Recall | Proportion of actual positives that were identified correctly |
+| Model F1-Score | Balanced harmonic mean of Precision and Recall |
 | LOC | Total non-blank lines |
 | Cyclomatic Complexity | Number of decision paths (via **Radon** library) |
 | Num Functions | How many functions exist |

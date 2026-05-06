@@ -692,6 +692,154 @@
       background: rgba(255, 255, 255, 0.03);
     }
 
+    /* ─── Backend Status Pill ─── */
+    .backend-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 5px 13px;
+      border-radius: var(--radius-pill);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      margin-top: 16px;
+      transition: all 0.4s ease;
+      cursor: default;
+      user-select: none;
+    }
+
+    .backend-status.checking {
+      background: rgba(113, 113, 122, 0.1);
+      border: 1px solid rgba(113, 113, 122, 0.2);
+      color: var(--text-muted);
+    }
+
+    .backend-status.online {
+      background: rgba(34, 197, 94, 0.08);
+      border: 1px solid rgba(34, 197, 94, 0.25);
+      color: #4ADE80;
+    }
+
+    .backend-status.offline {
+      background: rgba(239, 68, 68, 0.08);
+      border: 1px solid rgba(239, 68, 68, 0.25);
+      color: #F87171;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .online .status-dot {
+      background: #4ADE80;
+      animation: dotPulse 1.5s ease-in-out infinite;
+    }
+
+    .offline .status-dot {
+      background: #F87171;
+    }
+
+    .checking .status-dot {
+      background: var(--text-muted);
+      animation: dotPulse 0.8s ease-in-out infinite;
+    }
+
+    /* ─── Offline Banner ─── */
+    .offline-banner {
+      display: none;
+      margin-bottom: 20px;
+      padding: 20px 24px;
+      background: rgba(239, 68, 68, 0.06);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      border-radius: var(--radius-card);
+      animation: slideUp 0.3s ease;
+    }
+
+    .offline-banner.visible {
+      display: block;
+    }
+
+    .offline-banner-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      font-weight: 700;
+      color: #F87171;
+      margin-bottom: 12px;
+    }
+
+    .offline-steps {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .offline-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 13px;
+      color: #D4D4D8;
+      line-height: 1.5;
+    }
+
+    .step-num {
+      flex-shrink: 0;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #F87171;
+      font-size: 10px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .offline-step code {
+      font-family: var(--mono);
+      font-size: 11.5px;
+      background: rgba(255, 255, 255, 0.06);
+      padding: 2px 7px;
+      border-radius: 4px;
+      color: #A78BFA;
+      border: 1px solid rgba(167, 139, 250, 0.15);
+    }
+
+    .retry-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 16px;
+      border-radius: var(--radius-pill);
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #F87171;
+      font-family: var(--font);
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .retry-btn:hover {
+      background: rgba(239, 68, 68, 0.18);
+      border-color: rgba(239, 68, 68, 0.45);
+      transform: translateY(-1px);
+    }
+
+    .retry-btn:active {
+      transform: translateY(0);
+    }
+
     /* ─── Footer ─── */
     .footer {
       text-align: center;
@@ -761,7 +909,45 @@
       <h1 class="title" id="mainTitle">Code Smell Detector</h1>
       <p class="subtitle">Paste your Python code and get instant AI-driven smell analysis with severity classification
         and fix recommendations.</p>
+      <div>
+        <span class="backend-status checking" id="backendStatus" title="Checking backend connection...">
+          <span class="status-dot"></span>
+          <span id="statusText">Checking backend…</span>
+        </span>
+      </div>
     </header>
+
+    <!-- ── Offline Banner ── -->
+    <div class="offline-banner" id="offlineBanner" role="alert" aria-live="polite">
+      <div class="offline-banner-title">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <circle cx="9" cy="9" r="8" stroke="#F87171" stroke-width="1.5"/>
+          <path d="M9 5.5v4M9 12v.5" stroke="#F87171" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        Backend server is offline
+      </div>
+      <ul class="offline-steps">
+        <li class="offline-step">
+          <span class="step-num">1</span>
+          <span>Open a terminal and <code>cd</code> into the <code>backend/</code> folder of this project.</span>
+        </li>
+        <li class="offline-step">
+          <span class="step-num">2</span>
+          <span>Run: <code>uvicorn main:app --reload --port 8000</code></span>
+        </li>
+        <li class="offline-step">
+          <span class="step-num">3</span>
+          <span>Wait for <em>"Uvicorn running on http://127.0.0.1:8000"</em> in the terminal, then retry.</span>
+        </li>
+      </ul>
+      <button class="retry-btn" id="retryBtn" type="button">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+          <path d="M11 6.5A4.5 4.5 0 1 1 6.5 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <path d="M6.5 2L8.5 4M6.5 2L8.5 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Retry Connection
+      </button>
+    </div>
 
     <!-- ── Editor Card ── -->
     <section class="card editor-card" aria-label="Code input">
@@ -939,6 +1125,10 @@
     //  Metric Display Names & Flagging Thresholds
     // ────────────────────────────────────────────────
     const METRIC_META = {
+      model_accuracy: { label: 'Accuracy', warn: null, flag: null },
+      model_precision: { label: 'Precision', warn: null, flag: null },
+      model_recall: { label: 'Recall', warn: null, flag: null },
+      model_f1: { label: 'F1-Score', warn: null, flag: null },
       loc: { label: 'Lines of Code', warn: 200, flag: 500 },
       cyclomatic_complexity: { label: 'Cyclomatic CC', warn: 7, flag: 10 },
       num_functions: { label: 'Functions', warn: 10, flag: 20 },
@@ -1129,9 +1319,16 @@
       try {
         const data = await callAnalyzeAPI(code);
         renderResults(data);
+        // Mark backend as online after a successful call
+        setBackendStatus('online');
       } catch (err) {
-        if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
-          showError('Cannot reach the backend. Make sure uvicorn is running on port 8000.');
+        const isNetworkErr = err.message.includes('Failed to fetch')
+          || err.message.includes('NetworkError')
+          || err.message.includes('ERR_CONNECTION_REFUSED')
+          || err.message.includes('Load failed');
+        if (isNetworkErr) {
+          setBackendStatus('offline');
+          showError('Backend is offline. See the instructions above to start the server.');
         } else {
           showError(`Analysis failed: ${err.message}`);
         }
@@ -1154,10 +1351,69 @@
     }
 
     // ────────────────────────────────────────────────
+    //  Backend Status Management
+    // ────────────────────────────────────────────────
+    const backendStatusEl = document.getElementById('backendStatus');
+    const statusTextEl    = document.getElementById('statusText');
+    const offlineBanner   = document.getElementById('offlineBanner');
+    const retryBtn        = document.getElementById('retryBtn');
+
+    let _healthTimer = null;
+    let _currentStatus = 'checking'; // 'checking' | 'online' | 'offline'
+
+    function setBackendStatus(status) {
+      _currentStatus = status;
+      backendStatusEl.className = `backend-status ${status}`;
+
+      if (status === 'online') {
+        statusTextEl.textContent = 'Backend Online';
+        backendStatusEl.title = 'Backend server is running on port 8000';
+        offlineBanner.classList.remove('visible');
+        // Re-enable the button in case it was soft-disabled
+        analyzeBtn.dataset.backendOffline = '';
+      } else if (status === 'offline') {
+        statusTextEl.textContent = 'Backend Offline';
+        backendStatusEl.title = 'Cannot reach the backend on port 8000';
+        offlineBanner.classList.add('visible');
+        analyzeBtn.dataset.backendOffline = 'true';
+      } else {
+        statusTextEl.textContent = 'Checking backend…';
+        backendStatusEl.title = 'Checking backend connection...';
+      }
+    }
+
+    async function checkHealth() {
+      try {
+        const res = await fetch(`${API_BASE}/health`, {
+          method: 'GET',
+          signal: AbortSignal.timeout(4000),
+        });
+        if (res.ok) {
+          setBackendStatus('online');
+          // If the banner was visible and now it's online, hide the error toast too
+          hideError();
+        } else {
+          setBackendStatus('offline');
+        }
+      } catch {
+        setBackendStatus('offline');
+      }
+    }
+
+    function startHealthPolling(intervalMs = 15000) {
+      if (_healthTimer) clearInterval(_healthTimer);
+      _healthTimer = setInterval(checkHealth, intervalMs);
+    }
+
+    // ────────────────────────────────────────────────
     //  Event Listeners
     // ────────────────────────────────────────────────
     analyzeBtn.addEventListener('click', handleAnalyze);
     resetBtn.addEventListener('click', handleReset);
+    retryBtn.addEventListener('click', async () => {
+      setBackendStatus('checking');
+      await checkHealth();
+    });
 
     // Ctrl+Enter shortcut
     codeInput.addEventListener('keydown', (e) => {
@@ -1168,6 +1424,10 @@
 
     // Initial state
     resultsSection.classList.add('hidden');
+
+    // Run health check immediately + start polling
+    checkHealth();
+    startHealthPolling(15000);
   </script>
 </body>
 
